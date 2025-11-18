@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Determinación de Zona de Plateau (Ajuste Lineal)</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f9f9f9;
+        }
+        .container {
+            max-width: 1200px;
+            margin: auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        .input-section, .output-section, .results {
+            margin-bottom: 25px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        th, td {
+            border: 1px solid #ccc;
+            padding: 8px 12px;
+            text-align: center;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        input[type="number"] {
+            width: 100%;
+            padding: 6px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            padding: 12px 20px;
+            margin-top: 10px;
+            background-color: #2196F3;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #1976D2;
+        }
+        #chartContainer {
+            width: 100%;
+            height: 450px;
+            position: relative;
+        }
+        .results-content {
+            padding: 15px;
+            background-color: #f0f8ff;
+            border-left: 4px solid #2196F3;
+            border-radius: 4px;
+        }
+        .error {
+            color: red;
+            background-color: #ffebee;
+            padding: 10px;
+            border-radius: 4px;
+            margin-top: 10px;
+        }
+        .table-container {
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid #ccc;
+            margin-top: 10px;
+        }
+        .info {
+            background-color: #e8f5e8;
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+        }
+        .file-input-container {
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #f0f8ff;
+            border-radius: 4px;
+        }
+        input[type="file"] {
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Determinación de la Zona de Plateau (Ajuste Lineal)</h1>
+        
+        <div class="info">
+            <p><strong>Nota:</strong> El error estadístico de cada medida se considera como ±√(cuentas). El algoritmo busca el segmento con intervalo ≥200V que mejor se ajuste a una <strong>recta</strong> (no necesariamente constante), minimizando el χ² reducido.</p>
+        </div>
+        
+        <div class="input-section">
+            <h2>Ingrese los datos experimentales</h2>
+            <p>Complete la tabla con las tasas de conteo para cada voltaje:</p>
+            <div class="table-container">
+                <table id="dataTable">
+                    <thead>
+                        <tr>
+                            <th>Voltaje (V)</th>
+                            <th>Cuentas</th>
+                        </tr>
+                    </thead>
+                    <tbody id="dataTableBody">
+                    </tbody>
+                </table>
+            </div>
+            <br>
+            
+            <div class="file-input-container">
+                <label for="fileInput">O subir datos desde archivo .txt (una columna con los valores de cuentas, en el mismo orden que los voltajes):</label>
+                <input type="file" id="fileInput" accept=".txt">
+                <button onclick="loadFile()">Cargar archivo</button>
+            </div>
+            
+            <button onclick="processData()">Procesar Datos y Encontrar Plateau</button>
+            <div id="errorMessage"></div>
+        </div>
+
+        <div class="output-section">
+            <h2>Gráfico de Datos y Zona de Plateau</h2>
+            <div id="chartContainer">
+                <canvas id="myChart"></canvas>
+            </div>
+        </div>
+
+        <div class="results">
+            <h2>Resultados del Análisis</h2>
+            <div id="results" class="results-content">
+                <p>Ingrese datos y haga clic en "Procesar Datos" para ver los resultados.</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let chart = null;
+
+        // Generar tabla con voltajes predefinidos
+        function generateTable() {
+            const tbody = document.getElementById('dataTableBody');
+            tbody.innerHTML = '';
+            
+            for (let v = 250; v <= 900; v += 25) {
+                const row = document.createElement('tr');
+                
+                const voltageCell = document.createElement('td');
+                voltageCell.textContent = v;
+                voltageCell.style.fontWeight = 'bold';
+                
+                const countCell = document.createElement('td');
+                const input = document.createElement('input');
+                input.type = 'number';
+                input.min = '0';
+                input.step = '1';
+                input.placeholder = '0';
+                input.dataset.voltage = v;
+                input.dataset.index = (v - 250) / 25;
+                countCell.appendChild(input);
+                
+                row.appendChild(voltageCell);
+                row.appendChild(countCell);
+                tbody.appendChild(row);
+            }
+        }
+
+        // Cargar archivo de texto
+        function loadFile() {
+            const fileInput = document.getElementById('fileInput');
+            const file = fileInput.files[0];
+            if (!file) {
+                alert("Por favor seleccione un archivo .txt");
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const content = e.target.result;
+                const lines = content.split('\n');
+                
+                const inputs = document.querySelectorAll('#dataTableBody input[type="number"]');
+                inputs.forEach(input => {
+                    input.value = '';
+                });
+                
+                let loadedCount = 0;
+                let inputIndex = 0;
+                const inputsArray = Array.from(inputs);
+                
+                for (let line of lines) {
+                    line = line.trim();
+                    if (!line) continue;
+                    
+                    const cleanLine = line.replace(/[^\d.-]/g, '');
+                    if (!cleanLine) continue;
+                    
+                    const count = parseFloat(cleanLine);
+                    if (isNaN(count) || count < 0) continue;
+                    
+                    if (inputIndex < inputsArray.length) {
+                        inputsArray[inputIndex].value = Math.round(count);
+                        loadedCount++;
+                        inputIndex++;
+                    } else {
+                        break;
+                    }
+                }
+                
+                if (loadedCount === 0) {
+                    alert("No se encontraron datos válidos en el archivo.");
+                } else {
+                    alert(`Se cargaron ${loadedCount} valores correctamente.`);
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        // ========== NUEVO: Ajuste lineal ponderado ==========
+        function weightedLinearFit(x, y) {
+            // x, y: arrays de números
+            const n = x.length;
+            if (n < 2) return null;
+
+            // Calcular errores y pesos
+            const yerr = y.map(val => Math.sqrt(Math.max(val, 1)));
+            const weights = yerr.map(e => 1 / (e * e));
+
+            // Sumas necesarias para el ajuste lineal ponderado
+            let S = 0, Sx = 0, Sy = 0, Sxx = 0, Sxy = 0;
+            for (let i = 0; i < n; i++) {
+                S += weights[i];
+                Sx += weights[i] * x[i];
+                Sy += weights[i] * y[i];
+                Sxx += weights[i] * x[i] * x[i];
+                Sxy += weights[i] * x[i] * y[i];
+            }
+
+            const delta = S * Sxx - Sx * Sx;
+            if (Math.abs(delta) < 1e-12) return null; // Evitar división por cero
+
+            const a = (Sxx * Sy - Sx * Sxy) / delta; // intercepto
+            const b = (S * Sxy - Sx * Sy) / delta;     // pendiente
+
+            // Calcular chi2
+            let chi2 = 0;
+            for (let i = 0; i < n; i++) {
+                const yPred = b * x[i] + a;
+                const residual = y[i] - yPred;
+                chi2 += (residual * residual) / (yerr[i] * yerr[i]);
+            }
+
+            const chi2Reducido = n > 2 ? chi2 / (n - 2) : 0;
+
+            return { intercept: a, slope: b, chi2: chi2, chi2Reducido: chi2Reducido };
+        }
+
+        function findBestPlateauRegion(voltage, counts, minVoltageSpan = 200) {
+            const n = voltage.length;
+            const minPoints = Math.floor(minVoltageSpan / 25) + 1; // 25V steps
+            let bestChi2Red = Infinity;
+            let bestResult = null;
+
+            if (n < minPoints) return null;
+
+            for (let i = 0; i <= n - minPoints; i++) {
+                for (let j = i + minPoints; j <= n; j++) {
+                    const VSeg = voltage.slice(i, j);
+                    const CSeg = counts.slice(i, j);
+
+                    const fit = weightedLinearFit(VSeg, CSeg);
+                    if (!fit) continue;
+
+                    if (fit.chi2Reducido < bestChi2Red) {
+                        bestChi2Red = fit.chi2Reducido;
+                        bestResult = {
+                            startIdx: i,
+                            endIdx: j,
+                            vStart: VSeg[0],
+                            vEnd: VSeg[VSeg.length - 1],
+                            vSpan: VSeg[VSeg.length - 1] - VSeg[0],
+                            slope: fit.slope,
+                            intercept: fit.intercept,
+                            chi2Reducido: fit.chi2Reducido,
+                            nPoints: VSeg.length,
+                            plateauVoltages: VSeg,
+                            plateauCounts: CSeg
+                        };
+                    }
+                }
+            }
+
+            return bestResult;
+        }
+
+        function processData() {
+            const inputs = document.querySelectorAll('#dataTableBody input[type="number"]');
+            const voltages = [];
+            const counts = [];
+            const errorDiv = document.getElementById('errorMessage');
+            errorDiv.innerHTML = '';
+
+            try {
+                let validDataCount = 0;
+                for (let input of inputs) {
+                    const v = parseFloat(input.dataset.voltage);
+                    const c = input.value.trim() !== '' ? parseFloat(input.value) : NaN;
+                    
+                    if (!isNaN(c) && c >= 0) {
+                        voltages.push(v);
+                        counts.push(c);
+                        validDataCount++;
+                    }
+                }
+
+                if (validDataCount === 0) {
+                    throw new Error("No se encontraron datos válidos.");
+                }
+                if (validDataCount < 2) {
+                    throw new Error("Se necesitan al menos 2 puntos.");
+                }
+
+                const result = findBestPlateauRegion(voltages, counts, 200);
+                if (!result) {
+                    throw new Error("No se encontró una región válida (≥200V).");
+                }
+
+                const avgCount = result.plateauCounts.reduce((a, b) => a + b, 0) / result.plateauCounts.length;
+                const minCount = Math.min(...result.plateauCounts);
+                const maxCount = Math.max(...result.plateauCounts);
+                const absVariation = maxCount - minCount;
+                const relVariation = avgCount > 0 ? (absVariation / avgCount) * 100 : 0;
+                const tensionTrabajo = (result.vStart + result.vEnd) / 2;
+
+                // Calcular pendiente en %/V
+                const slopePercPerVolt = result.slope * 100 / avgCount;
+
+                let resultsHTML = `
+                    <p><strong>Zona de Plateau identificada:</strong> ${result.vStart} – ${result.vEnd} V</p>
+                    <p><strong>Intervalo de voltaje:</strong> ${result.vSpan.toFixed(1)} V</p>
+                    <p><strong>χ² reducido (ajuste lineal):</strong> ${result.chi2Reducido.toFixed(4)}</p>
+                    <p><strong>Pendiente:</strong> ${result.slope.toFixed(2)} cuentas/V (${slopePercPerVolt.toFixed(4)} %/V)</p>
+                    <p><strong>Tasa de conteo promedio:</strong> ${avgCount.toFixed(2)} cuentas</p>
+                    <p><strong>Variación relativa:</strong> ${relVariation.toFixed(2)} %</p>
+                    <p><strong>Tensión de trabajo recomendada:</strong> ${tensionTrabajo.toFixed(1)} V</p>
+                `;
+
+                if (result.vSpan < 200) {
+                    resultsHTML += `<p style="color: #d32f2f; font-weight: bold;">⚠️ Nota: El intervalo encontrado (${result.vSpan.toFixed(1)} V) es menor que los 200V recomendados.</p>`;
+                }
+
+                document.getElementById('results').innerHTML = resultsHTML;
+
+                // Generar puntos para la línea ajustada
+                const lineX = result.plateauVoltages;
+                const lineY = lineX.map(x => result.slope * x + result.intercept);
+
+                updateChart(voltages, counts, result.plateauVoltages, result.plateauCounts, lineX, lineY);
+
+            } catch (error) {
+                errorDiv.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+                document.getElementById('results').innerHTML = '<p>Ocurrió un error.</p>';
+                if (chart) {
+                    chart.destroy();
+                    chart = null;
+                }
+            }
+        }
+
+        function updateChart(voltages, counts, plateauVoltages, plateauCounts, lineX, lineY) {
+            const ctx = document.getElementById('myChart').getContext('2d');
+            if (chart) chart.destroy();
+
+            chart = new Chart(ctx, {
+                type: 'scatter',
+                data: {
+                    datasets: [
+                        {
+                            label: 'Datos experimentales',
+                            data: voltages.map((v, i) => ({ x: v, y: counts[i] })),
+                            backgroundColor: 'rgba(75, 192, 192, 0.6)',
+                            borderColor: 'rgba(75, 192, 192, 1)',
+                            borderWidth: 1,
+                            pointRadius: 6
+                        },
+                        {
+                            label: 'Zona de Plateau',
+                            data: plateauVoltages.map((v, i) => ({ x: v, y: plateauCounts[i] })),
+                            backgroundColor: 'rgba(255, 99, 132, 0.8)',
+                            borderColor: 'rgba(255, 99, 132, 1)',
+                            borderWidth: 2,
+                            pointRadius: 8,
+                            pointStyle: 'rectRot'
+                        },
+                        {
+                            label: 'Ajuste lineal',
+                            data: lineX.map((x, i) => ({ x: x, y: lineY[i] })),
+                            type: 'line',
+                            borderColor: 'rgba(54, 162, 235, 1)',
+                            backgroundColor: 'transparent',
+                            pointRadius: 0,
+                            fill: false,
+                            tension: 0
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            title: { display: true, text: 'Voltaje (V)' },
+                            min: Math.min(...voltages) - 10,
+                            max: Math.max(...voltages) + 10
+                        },
+                        y: {
+                            title: { display: true, text: 'Tasa de conteo (cuentas)' },
+                            min: Math.min(...counts) - 10,
+                            max: Math.max(...counts) + 10
+                        }
+                    },
+                    plugins: {
+                        legend: { position: 'top' },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return `${context.dataset.label}: (${context.parsed.x}, ${context.parsed.y.toFixed(2)})`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        window.addEventListener('DOMContentLoaded', generateTable);
+    </script>
+</body>
+</html>
+
