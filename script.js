@@ -472,15 +472,17 @@ function findBestPlateauRegion(voltage, counts, minVoltageSpan = 200, minPoints 
                 bestChi2Red = fitResult.chi2Reducido;
                 bestSegmentPoints = [i, j];
                 bestResult = {
-                    startIdx: i,
-                    endIdx: j,
-                    vStart: VSeg[0],
-                    vEnd: VSeg[VSeg.length - 1],
-                    vSpan: voltageSpan,
-                    fitResult: fitResult,
-                    nPoints: VSeg.length,
-                    plateauVoltages: VSeg,
-                    plateauCounts: CSeg
+                   
+    startIdx: i,
+    endIdx: j,
+    vStart: VSeg[0],
+    vEnd: VSeg[VSeg.length - 1],
+    vSpan: voltageSpan,
+    fitResult: fitResult,
+    nPoints: VSeg.length,
+    plateauVoltages: VSeg,
+    plateauCounts: CSeg,
+    totalSegmentsEvaluated: totalSegmentsEvaluated               
                 };
             }
         }
@@ -889,3 +891,4 @@ window.addEventListener('DOMContentLoaded', function() {
     logDebug('Aplicación inicializada correctamente');
 
 });
+
