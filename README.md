@@ -1,6 +1,6 @@
 # Análisis Avanzado de Zona de Plateau
 
-![Interfaz de la aplicación](https://via.placeholder.com/800x400?text=An%C3%A1lisis+de+Zona+de+Plateau)
+
 
 Aplicación web para el análisis estadístico avanzado de curvas características de detectores de radiación (tubos Geiger-Müller), con identificación automática de la zona de plateau óptima y cálculo de parámetros operativos.
 
