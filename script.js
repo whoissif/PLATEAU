@@ -608,7 +608,7 @@ function processData() {
             resultsHTML += `
             <hr>
             <h4>Detalles de Depuración</h4>
-            <p><strong>Segmentos evaluados:</strong> ${totalSegmentsEvaluated}</p>
+            <p><strong>Segmentos evaluados:</strong> ${result.totalSegmentsEvaluated}</p>
             <p><strong>Mejor segmento:</strong> Índices [${result.startIdx}, ${result.endIdx - 1}]</p>
             <p><strong>Valores del plateau:</strong> ${result.plateauCounts.join(', ')}</p>
             `;
@@ -887,4 +887,5 @@ window.addEventListener('DOMContentLoaded', function() {
         }
     });
     logDebug('Aplicación inicializada correctamente');
+
 });
