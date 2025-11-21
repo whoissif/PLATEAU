@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔬 PlateauLab - Análisis de Zona de Plateau</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@1.0.2"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="app-container">
+        <header>
+            <div class="logo">
+                <i class="fas fa-radiation-alt logo-icon"></i>
+                <div>
+                    <h1>PlateauLab Interactive</h1>
+                    <p class="subtitle">Análisis avanzado de zona de plateau para detectores de radiación</p>
+                </div>
+            </div>
+        </header>
+        <div class="tabs-container">
+            <div class="tabs">
+                <div class="tab active" data-tab="input">
+                    <i class="fas fa-edit"></i> Entrada de Datos
+                </div>
+                <div class="tab" data-tab="parameters">
+                    <i class="fas fa-sliders-h"></i> Parámetros de Análisis
+                </div>
+                <div class="tab" data-tab="results">
+                    <i class="fas fa-chart-line"></i> Resultados y Gráficos
+                </div>
+            </div>
+            <div class="tab-content">
+                <!-- Pestaña 1: Entrada de Datos -->
+                <div class="tab-pane active" id="input-tab">
+                    <div class="highlight-section">
+                        <h4><i class="fas fa-info-circle"></i> Instrucciones:</h4>
+                        <p>1. Seleccione el método de entrada de datos.<br>
+                           2. Complete la tabla con los valores de voltaje y cuentas.<br>
+                           3. Ajuste los parámetros de análisis en la siguiente pestaña.<br>
+                           4. Pulse <strong>"Procesar Datos"</strong> para obtener el análisis de la zona de plateau.</p>
+                    </div>
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-icon">
+                                <i class="fas fa-database"></i>
+                            </div>
+                            <h3 class="card-title">Método de Entrada de Datos</h3>
+                        </div>
+                        <div class="parameters-grid">
+                            <div class="parameter-group">
+                                <h4><i class="fas fa-keyboard"></i> Entrada Manual</h4>
+                                <p style="margin-bottom: 15px;">Complete directamente la tabla con sus mediciones experimentales.</p>
+                                <button class="btn btn-primary" onclick="switchInputMethod('manual')">
+                                    <i class="fas fa-edit"></i> Usar entrada manual
+                                </button>
+                            </div>
+                            <div class="parameter-group">
+                                <h4><i class="fas fa-file-upload"></i> Carga de Archivos</h4>
+                                <p style="margin-bottom: 15px;">Importe datos desde archivos .txt o .csv</p>
+                                <div class="form-group">
+                                    <input type="file" id="fileInput" accept=".txt,.csv" class="form-control">
+                                </div>
+                                <button class="btn btn-outline" onclick="loadFile()">
+                                    <i class="fas fa-file-import"></i> Cargar archivo
+                                </button>
+                                <button class="btn btn-outline" style="margin-top: 8px;" onclick="downloadExampleFile()">
+                                    <i class="fas fa-download"></i> Descargar ejemplo
+                                </button>
+                            </div>
+                            <div class="parameter-group">
+                                <h4><i class="fas fa-flask"></i> Datos de Ejemplo</h4>
+                                <p style="margin-bottom: 15px;">Pruebe la aplicación con conjuntos de datos predefinidos.</p>
+                                <div class="btn-group" style="flex-direction: column; gap: 8px;">
+                                    <button class="btn btn-success" onclick="loadExample('gm-tube')">
+                                        <i class="fas fa-microscope"></i> Contador G-M típico
+                                    </button>
+                                    <button class="btn btn-warning" onclick="loadExample('noisy-data')">
+                                        <i class="fas fa-wind"></i> Datos con ruido alto
+                                    </button>
+                                    <button class="btn btn-danger" onclick="loadExample('no-plateau')">
+                                        <i class="fas fa-exclamation-triangle"></i> Sin plateau claro
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-icon">
+                                <i class="fas fa-table"></i>
+                            </div>
+                            <h3 class="card-title">Tabla de Datos Experimentales</h3>
+                        </div>
+                        <div class="table-header">
+                            <h3><i class="fas fa-list"></i> Mediciones de Voltaje vs Cuentas</h3>
+                            <p>Introduzca los valores de conteo para cada voltaje. <strong style="color: #4361ee;">Los primeros puntos (bajo voltaje) suelen corresponder a ruido de fondo.</strong></p>
+                        </div>
+                        <div class="data-table-container">
+                            <table id="dataTable">
+                                <thead>
+                                    <tr>
+                                        <th>Voltaje (V)</th>
+                                        <th>Cuentas<br><small>(total)</small></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="dataTableBody">
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="table-footer">
+                            <div class="btn-group">
+                                <button onclick="processData()" class="btn btn-primary">
+                                    <i class="fas fa-bolt"></i> Procesar Datos
+                                </button>
+                                <button onclick="clearTable()" class="btn btn-outline">
+                                    <i class="fas fa-trash"></i> Limpiar Tabla
+                                </button>
+                                <button onclick="generateRandomData()" class="btn btn-outline">
+                                    <i class="fas fa-dice"></i> Generar Aleatorios
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Pestaña 2: Parámetros de Análisis -->
+                <div class="tab-pane" id="parameters-tab">
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-icon">
+                                <i class="fas fa-cogs"></i>
+                            </div>
+                            <h3 class="card-title">Configuración Avanzada del Análisis</h3>
+                        </div>
+                        <div class="parameters-grid">
+                            <div class="parameter-group">
+                                <h4><i class="fas fa-chart-line"></i> Tipo de Ajuste</h4>
+                                <div class="form-group">
+                                    <label class="radio-label">
+                                        <input type="radio" name="fitType" value="linear" checked>
+                                        <span class="radio-custom"></span>
+                                        <span class="radio-label-text"><strong>Ajuste Lineal</strong><br><small>y = mx + b</small></span>
+                                    </label>
+                                    <label class="radio-label" style="margin-top: 10px;">
+                                        <input type="radio" name="fitType" value="quadratic">
+                                        <span class="radio-custom"></span>
+                                        <span class="radio-label-text"><strong>Ajuste Cuadrático</strong><br><small>y = ax² + bx + c</small></span>
+                                    </label>
+                                </div>
+                                <div class="highlight-section" style="margin-top: 15px; padding: 12px;">
+                                    <p><i class="fas fa-info-circle"></i> <strong>Nota:</strong> <span id="analysisNote">El error estadístico de cada medida se considera como ±√(cuentas). El algoritmo busca el segmento con intervalo ≥200V que mejor se ajuste a una recta, minimizando el χ² reducido.</span></p>
+                                </div>
+                            </div>
+                            <div class="parameter-group">
+                                <h4><i class="fas fa-ruler-horizontal"></i> Parámetros de Búsqueda</h4>
+                                <div class="form-group">
+                                    <label for="minVoltageSpan">Rango mínimo de voltaje (V)</label>
+                                    <input type="number" id="minVoltageSpan" class="form-control" value="300" min="50" max="600" step="25">
+                                    <small class="form-text">Intervalo mínimo que debe tener la zona de plateau candidata</small>
+                                </div>
+                                <div class="form-group">
+                                    <label for="minPoints">Mínimo de puntos en el segmento</label>
+                                    <input type="number" id="minPoints" class="form-control" value="9" min="3" max="30" step="1">
+                                    <small class="form-text">Número mínimo de puntos para considerar una región válida</small>
+                                </div>
+                                <div class="form-group">
+                                    <label for="optimizationLevel">Nivel de optimización (1-10)</label>
+                                    <input type="number" id="optimizationLevel" class="form-control" value="3" min="1" max="10" step="1">
+                                    <small class="form-text">Valores altos aceleran el cálculo pero pueden omitir segmentos</small>
+                                </div>
+                            </div>
+                            <div class="parameter-group">
+                                <h4><i class="fas fa-bug"></i> Opciones de Depuración</h4>
+                                <div class="form-group">
+                                    <label class="checkbox-label">
+                                        <input type="checkbox" id="debugMode">
+                                        <span class="checkbox-custom"></span>
+                                        <span class="checkbox-label-text">Modo depuración (mostrar logs detallados)</span>
+                                    </label>
+                                </div>
+                                <div class="debug-panel" id="debugPanel" style="display: none;">
+                                    <h4 style="margin-bottom: 10px; color: var(--dark);"><i class="fas fa-terminal"></i> Logs de Depuración:</h4>
+                                    <div style="background: #1e293b; color: #f1f5f9; padding: 15px; border-radius: 8px; max-height: 300px; overflow: auto; font-family: monospace; margin-bottom: 15px;">
+                                        <pre id="debugLog" style="margin: 0; white-space: pre-wrap;"></pre>
+                                    </div>
+                                    <button onclick="clearDebugLog()" class="btn btn-outline" style="width: 100%;">
+                                        <i class="fas fa-eraser"></i> Limpiar logs
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Pestaña 3: Resultados y Gráficos -->
+                <div class="tab-pane" id="results-tab">
+                    <div id="resultsPlaceholder" style="text-align: center; padding: 40px 20px; color: var(--gray);">
+                        <i class="fas fa-chart-area" style="font-size: 3rem; margin-bottom: 20px; opacity: 0.7;"></i>
+                        <h3 style="margin-bottom: 15px; color: var(--dark);">Resultados del Análisis</h3>
+                        <p>Los resultados aparecerán aquí después de procesar los datos. Se mostrará la zona de plateau identificada, los parámetros del ajuste y el gráfico correspondiente.</p>
+                    </div>
+                    <div id="resultsSection" style="display: none;">
+                        <div class="card">
+                            <div class="card-header">
+                                <div class="card-icon">
+                                    <i class="fas fa-chart-line"></i>
+                                </div>
+                                <h3 class="card-title">Gráfico de Análisis</h3>
+                            </div>
+                            <div class="chart-container-wrapper">
+                                <div class="chart-header">
+                                    <h3 style="font-size: 1.3rem; color: var(--dark); margin: 0;"><i class="fas fa-wave-square"></i> Curva de Respuesta y Zona de Plateau</h3>
+                                    <div class="chart-actions">
+                                        <button class="btn btn-outline" onclick="toggleChartType()">
+                                            <i class="fas fa-sync-alt"></i> Cambiar tipo
+                                        </button>
+                                        <button class="btn btn-outline" onclick="downloadChartImage()">
+                                            <i class="fas fa-download"></i> Descargar imagen
+                                        </button>
+                                    </div>
+                                </div>
+                                <canvas id="myChart" style="height: 450px;"></canvas>
+                            </div>
+                        </div>
+                        <div class="results-grid">
+                            <div class="result-card">
+                                <div class="result-label">Zona de Plateau</div>
+                                <div class="result-value" id="plateauRange">-</div>
+                                <div class="result-unit">Voltios</div>
+                            </div>
+                            <div class="result-card" style="background: linear-gradient(135deg, #3a86ff 0%, #8338ec 100%);">
+                                <div class="result-label">χ² reducido</div>
+                                <div class="result-value" id="chiSquared">-</div>
+                                <div class="result-unit">Calidad de ajuste</div>
+                            </div>
+                            <div class="result-card" style="background: linear-gradient(135deg, #ff9e6d 0%, #ff5400 100%);">
+                                <div class="result-label">Variación Relativa</div>
+                                <div class="result-value" id="relVariation">-</div>
+                                <div class="result-unit">Porcentaje (%)</div>
+                            </div>
+                            <div class="result-card" style="background: linear-gradient(135deg, #16c79a 0%, #1bb8b8 100%);">
+                                <div class="result-label">Tensión de Trabajo</div>
+                                <div class="result-value" id="tensionTrabajo">-</div>
+                                <div class="result-unit">Voltios recomendados</div>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <div class="card-header">
+                                <div class="card-icon">
+                                    <i class="fas fa-file-alt"></i>
+                                </div>
+                                <h3 class="card-title">Detalles del Análisis</h3>
+                            </div>
+                            <div id="results" style="padding: 20px;">
+                                <p>Los resultados detallados aparecerán aquí después del análisis.</p>
+                            </div>
+                            <div style="padding: 15px; border-top: 1px solid #eee; display: flex; justify-content: center; gap: 15px; flex-wrap: wrap;">
+                                <button onclick="exportResults()" class="btn btn-primary">
+                                    <i class="fas fa-file-export"></i> Exportar Resultados
+                                </button>
+                                <button onclick="printResults()" class="btn btn-outline">
+                                    <i class="fas fa-print"></i> Imprimir
+                                </button>
+                                <button onclick="copyResultsToClipboard()" class="btn btn-outline">
+                                    <i class="fas fa-copy"></i> Copiar al Portapapeles
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="message-container" id="messageContainer"></div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
